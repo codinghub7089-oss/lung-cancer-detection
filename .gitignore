@@ -1,0 +1,16 @@
+# Python environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local configuration and editor files
+.env
+.vscode/
+
+# Local datasets and generated results
+/lung_colon_image_set/
+/lung_image_sets/
+/colon_image_sets/
+/outputs/

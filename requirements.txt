@@ -1,0 +1,11 @@
+numpy
+pandas
+opencv-python
+scikit-learn
+scikit-optimize
+optuna
+tensorflow
+matplotlib
+seaborn
+tqdm
+joblib

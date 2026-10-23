@@ -1,0 +1,13 @@
+{
+  "best_method": "bayesian",
+  "class_names": [
+    "Benign",
+    "Malignant"
+  ],
+  "feature_type": "cnn_vgg16",
+  "image_size": [
+    224,
+    224
+  ],
+  "accuracy": 0.9993322203672788
+}
