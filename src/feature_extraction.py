@@ -68,6 +68,22 @@ def classical_features(gray_images):
     return np.array(feats)
 
 
+def _manual_hog(gray_img, bins=9):
+    """Fallback HOG-like descriptor for OpenCV builds without HOGDescriptor."""
+    import cv2
+
+    resized = cv2.resize(gray_img, (64, 64))
+    gx = cv2.Sobel(resized, cv2.CV_32F, 1, 0, ksize=1)
+    gy = cv2.Sobel(resized, cv2.CV_32F, 0, 1, ksize=1)
+    magnitude = np.hypot(gx, gy)
+    angle_deg = np.mod(np.degrees(np.arctan2(gy, gx)) + 180.0, 180.0)
+    bin_idx = (angle_deg / (180.0 / bins)).astype(np.int32)
+    hist = np.zeros(bins, dtype=np.float32)
+    np.add.at(hist, bin_idx.ravel(), magnitude.ravel())
+    hist /= hist.sum() + 1e-8
+    return hist
+
+
 def classical_features_rich(rgb_images, gray_images):
     """
     Stronger no-download, no-GPU feature extractor. Combines:
@@ -97,10 +113,14 @@ def classical_features_rich(rgb_images, gray_images):
     """
     import cv2
 
-    hog = cv2.HOGDescriptor(
-        _winSize=(64, 64), _blockSize=(16, 16), _blockStride=(8, 8),
-        _cellSize=(8, 8), _nbins=9,
-    )
+    try:
+        hog = cv2.HOGDescriptor(
+            _winSize=(64, 64), _blockSize=(16, 16), _blockStride=(8, 8),
+            _cellSize=(8, 8), _nbins=9,
+        )
+        use_manual_hog = False
+    except AttributeError:
+        use_manual_hog = True
 
     feats = []
     for rgb, gray in zip(rgb_images, gray_images):
@@ -127,7 +147,10 @@ def classical_features_rich(rgb_images, gray_images):
 
         # 6. HOG shape/texture descriptor
         resized = cv2.resize(gray, (64, 64))
-        hog_feat = hog.compute(resized).flatten()
+        if use_manual_hog:
+            hog_feat = _manual_hog(gray)
+        else:
+            hog_feat = hog.compute(resized).flatten()
 
         feats.append(np.concatenate(
             [color_hist, gh, stats, edge_density, lap_var, hog_feat]

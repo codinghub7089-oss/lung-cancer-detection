@@ -63,7 +63,23 @@ python main.py --data_root path/to/lung_colon_image_set/lung_image_sets
 
 Results (confusion matrices + optimization comparison chart) are saved to `outputs/`.
 
-## 4. Project structure
+## 4. Local prediction UI
+
+Install the project dependencies, then start the image-prediction interface:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Open the local URL printed by Streamlit, select an available trained model,
+upload a JPG/PNG histopathology image, and choose **Analyze image**. The UI
+shows the predicted class and class probabilities. It is a research/demo tool,
+not a medical diagnosis. The default boosting option uses
+`outputs_boosting_quick/`; bagging is selectable when its artifacts are present
+in `outputs_bagging/`.
+
+## 5. Project structure
 
 ```
 main.py                    # orchestrates the full pipeline
@@ -76,7 +92,7 @@ src/
   evaluate.py              # metrics + confusion matrix + comparison plots
 ```
 
-## 5. Notes / decisions made where the thesis was ambiguous
+## 6. Notes / decisions made where the thesis was ambiguous
 
 - **Feature extractor**: the thesis mentions Keras/TensorFlow for
   "Model Implementation" but doesn't specify the exact feature
@@ -99,7 +115,7 @@ src/
   the *architecture*, not a byte-for-byte reproduction of the reported
   numbers.
 
-## 6. Next steps
+## 7. Next steps
 
 - Run `--quick` first to confirm everything works end-to-end on your machine.
 - Then run the full version and compare your confusion matrices /
