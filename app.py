@@ -72,58 +72,125 @@ if not available_models:
 left, right = st.columns([1, 1.15], gap="large")
 
 with left:
-    st.subheader("Analyze an image")
+    st.subheader("Analyze images")
     model_name = st.selectbox("Model", available_models)
-    uploaded_file = st.file_uploader(
-        "Choose a histopathology image",
+    uploaded_files = st.file_uploader(
+        "Choose histopathology images",
         type=["jpg", "jpeg", "png"],
+        accept_multiple_files=True,
         help="Supported formats: JPG and PNG.",
     )
 
-    if uploaded_file is not None:
-        st.image(uploaded_file, caption=uploaded_file.name, use_container_width=True)
-        analyze = st.button("Analyze image", type="primary", use_container_width=True)
-        image_bytes = uploaded_file.getvalue()
-        result_key = (model_name, hashlib.sha256(image_bytes).hexdigest())
+    if uploaded_files:
+        image_bytes_list = [uploaded_file.getvalue() for uploaded_file in uploaded_files]
+        result_key = (
+            model_name,
+            tuple(
+                (uploaded_file.name, hashlib.sha256(image_bytes).hexdigest())
+                for uploaded_file, image_bytes in zip(uploaded_files, image_bytes_list)
+            ),
+        )
+        with st.expander(f"Preview {len(uploaded_files)} selected image(s)"):
+            for uploaded_file in uploaded_files:
+                st.image(
+                    uploaded_file,
+                    caption=uploaded_file.name,
+                    use_container_width=True,
+                )
+        analyze = st.button(
+            f"Analyze {len(uploaded_files)} image(s)",
+            type="primary",
+            use_container_width=True,
+        )
     else:
-        st.info("Upload a JPG or PNG image to begin.")
+        st.info("Upload one or more JPG or PNG images to begin.")
         analyze = False
-        image_bytes = None
+        image_bytes_list = []
         result_key = None
 
 with right:
     st.subheader("Prediction")
-    if uploaded_file is not None and analyze:
-        try:
-            with st.spinner(f"Analyzing with the {model_name} model..."):
-                model, metadata, preprocessing = get_model_bundle(model_name)
-                result = predict_image_bytes(
-                    image_bytes, model, metadata, preprocessing
-                )
+    saved_prediction = st.session_state.get("prediction_batch")
+    if saved_prediction and (not uploaded_files or saved_prediction.get("key") != result_key):
+        st.session_state.pop("prediction_batch", None)
+        saved_prediction = None
 
-            st.session_state["prediction_result"] = {
-                "key": result_key,
-                "result": result,
-                "metadata": metadata,
-            }
+    if uploaded_files and analyze:
+        batch_results = []
+        try:
+            with st.spinner(
+                f"Analyzing {len(uploaded_files)} image(s) with the {model_name} model..."
+            ):
+                model, metadata, preprocessing = get_model_bundle(model_name)
+                for uploaded_file, image_bytes in zip(uploaded_files, image_bytes_list):
+                    try:
+                        result = predict_image_bytes(
+                            image_bytes, model, metadata, preprocessing
+                        )
+                        batch_results.append(
+                            {
+                                "filename": uploaded_file.name,
+                                "result": result,
+                                "error": None,
+                            }
+                        )
+                    except (OSError, ValueError, KeyError, ImportError) as error:
+                        batch_results.append(
+                            {
+                                "filename": uploaded_file.name,
+                                "result": None,
+                                "error": str(error),
+                            }
+                        )
+                    except Exception as error:
+                        batch_results.append(
+                            {
+                                "filename": uploaded_file.name,
+                                "result": None,
+                                "error": f"{type(error).__name__}: {error}",
+                            }
+                        )
         except (OSError, ValueError, KeyError, ImportError) as error:
-            st.error(f"Could not complete prediction: {error}")
+            st.error(f"Could not load the {model_name} model: {error}")
         except Exception as error:
             st.exception(error)
+        else:
+            st.session_state["prediction_batch"] = {
+                "key": result_key,
+                "results": batch_results,
+                "metadata": metadata,
+            }
+            saved_prediction = st.session_state["prediction_batch"]
 
-    saved_prediction = st.session_state.get("prediction_result")
     if saved_prediction and saved_prediction["key"] == result_key:
-        result = saved_prediction["result"]
         metadata = saved_prediction["metadata"]
-        st.markdown('<div class="result-card">', unsafe_allow_html=True)
-        st.metric("Predicted class", result["label"])
-        st.metric("Model confidence", f'{result["confidence"]:.1%}')
-        st.markdown("</div>", unsafe_allow_html=True)
+        rows = []
+        for item in saved_prediction["results"]:
+            result = item["result"]
+            rows.append(
+                {
+                    "Image": item["filename"],
+                    "Predicted class": result["label"] if result else "Failed",
+                    "Confidence": f'{result["confidence"]:.1%}' if result else "—",
+                    "Status": "Success" if result else item["error"],
+                }
+            )
+        st.dataframe(rows, hide_index=True, use_container_width=True)
 
-        st.markdown("#### Class probabilities")
-        for class_name, probability in result["probabilities"].items():
-            st.write(f"**{class_name}** — {probability:.1%}")
-            st.progress(probability)
+        for item in saved_prediction["results"]:
+            result = item["result"]
+            with st.expander(
+                f'{item["filename"]} — {result["label"] if result else "Prediction failed"}'
+            ):
+                if result:
+                    st.metric("Predicted class", result["label"])
+                    st.metric("Model confidence", f'{result["confidence"]:.1%}')
+                    st.markdown("#### Class probabilities")
+                    for class_name, probability in result["probabilities"].items():
+                        st.write(f"**{class_name}** — {probability:.1%}")
+                        st.progress(probability)
+                else:
+                    st.error(f'Could not predict this image: {item["error"]}')
 
         st.caption(
             f"Model: {model_name} · Best method: "
@@ -133,8 +200,8 @@ with right:
     else:
         st.markdown(
             '<div class="result-card muted">Upload an image and click '
-            "Analyze image to see the prediction. The result stays visible "
-            "while this image and model are selected.</div>",
+            "Analyze images to see the predictions. Results stay visible "
+            "while these images and model are selected.</div>",
             unsafe_allow_html=True,
         )
 

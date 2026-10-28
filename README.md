@@ -73,9 +73,10 @@ streamlit run app.py
 ```
 
 Open the local URL printed by Streamlit, select an available trained model,
-upload a JPG/PNG histopathology image, and choose **Analyze image**. The UI
-shows the predicted class and class probabilities. It is a research/demo tool,
-not a medical diagnosis. The default boosting option uses
+upload one or more JPG/PNG histopathology images, and choose **Analyze**. The UI
+shows each image's predicted class and confidence, with class probabilities
+available per image. It is a research/demo tool, not a medical diagnosis.
+The default boosting option uses
 `outputs_boosting_quick/`; bagging is selectable when its artifacts are present
 in `outputs_bagging/`.
 
